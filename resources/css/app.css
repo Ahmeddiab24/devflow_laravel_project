@@ -1,0 +1,6 @@
+/* DevFlow — global CSS reset/utilities */
+/* Most styles are defined in resources/views/layouts/app.blade.php */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
