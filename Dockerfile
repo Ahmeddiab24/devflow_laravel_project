@@ -62,9 +62,10 @@ COPY --chown=www:www --from=node-builder /app/public/build ./public/build
 
 #changing ownership for web server user and group to access the application files
 #extra safety check for chnging ownership 
-RUN chown -R www:www /var/www/html && \
-    chmod -R 755 /var/www/html/storage && \
-    chmod -R 755 /var/www/html/bootstrap/cache
+RUN mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache && \
+    chown -R www:www /var/www/html && \
+    chmod -R 775 /var/www/html/storage && \
+    chmod -R 775 /var/www/html/bootstrap/cache
 
 #copy supervisor configuration for queue worker, php-fpm.
 #allowing your single container to act like two machines (a Web Server and a Background Worker)
