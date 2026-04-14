@@ -1,60 +1,35 @@
 #!/bin/sh
-##############################################################################
-#  DevFlow — Docker Entrypoint
-#  Runs on container start. Handles first-boot setup and graceful restarts.
-##############################################################################
 set -e
 
-echo "🚀 DevFlow entrypoint starting..."
+# Define the app path clearly to avoid "file not found" errors
+APP_PATH="/var/www/html"
 
-# ── Wait for MySQL ─────────────────────────────────────────────────────────
+echo "🚀 Starting DevFlow..."
+
+# ── 1. Wait for MySQL (Simplified check) ───────────────────
 echo "⏳ Waiting for MySQL..."
-until php -r "new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}');" 2>/dev/null; do
-    echo "   MySQL not ready, retrying in 2s..."
+until php -r "try { new PDO('mysql:host=${DB_HOST};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}'); } catch (Exception \$e) { exit(1); }" 2>/dev/null; do
     sleep 2
 done
-echo "✅ MySQL is ready"
+echo "✅ Database connected."
 
-# ── Wait for Redis ─────────────────────────────────────────────────────────
-echo "⏳ Waiting for Redis..."
-until redis-cli -h "${REDIS_HOST:-redis}" -p "${REDIS_PORT:-6379}" ping 2>/dev/null | grep -q PONG; do
-    echo "   Redis not ready, retrying in 2s..."
-    sleep 2
-done
-echo "✅ Redis is ready"
+# ── 2. Run Critical Laravel Tasks ──────────────────────────
+# We use full paths here to ensure it never fails
+cd $APP_PATH
 
-# ── Generate App Key (first boot only) ────────────────────────────────────
-if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "" ]; then
-    echo "🔑 Generating application key..."
-    php artisan key:generate --force
-fi
+echo "🔑 Ensuring App Key..."
+php artisan key:generate --force --no-interaction
 
-# ── Run Migrations ─────────────────────────────────────────────────────────
-echo "🗄️  Running migrations..."
+echo "🗄️  Running Migrations..."
 php artisan migrate --force --no-interaction
 
-# ── Seed on first boot (if DB is empty) ───────────────────────────────────
-USER_COUNT=$(php artisan tinker --execute="echo App\\Models\\User::count();" 2>/dev/null | tail -1 || echo "0")
-if [ "$USER_COUNT" = "0" ]; then
-    echo "🌱 Seeding database..."
-    php artisan db:seed --force --no-interaction
-fi
+# ── 3. Storage Permissions ─────────────────────────────────
+# Alpine uses 'chown' better than 'chmod' for Laravel
+chown -R www:www storage bootstrap/cache
 
-# ── Cache configuration for production ────────────────────────────────────
-if [ "$APP_ENV" = "production" ]; then
-    echo "⚡ Caching config, routes and views..."
-    php artisan config:cache
-    php artisan route:cache
-    php artisan view:cache
-    php artisan event:cache
-else
-    echo "🔧 Development mode - skipping cache"
-fi
+echo "✅ DevFlow is ready to go!"
 
-# ── Fix storage permissions ────────────────────────────────────────────────
-chmod -R 775 storage bootstrap/cache 2>/dev/null || true
-
-echo "✅ DevFlow ready!"
-
-# ── Execute main process ───────────────────────────────────────────────────
+# ── 4. Start the Process ───────────────────────────────────
+# This executes whatever command is in your Dockerfile (CMD) or docker-compose
+# In docker/entrypoint.sh, change the last line to:
 exec "$@"

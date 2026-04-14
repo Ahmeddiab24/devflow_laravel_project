@@ -1,10 +1,10 @@
 services:
   app:
     build: .
+    platform: linux/amd64
     container_name: devflow_app
+    working_dir: /var/www/html
     env_file: .env
-    volumes:
-      - .:/var/www/html
     depends_on:
       - mysql
       - redis 
@@ -37,17 +37,6 @@ services:
     container_name: devflow_redis
     ports:
       - "6379:6379"
-
-  worker:
-    build: .
-    container_name: devflow_worker
-    env_file: .env
-    volumes:
-      - .:/var/www/html
-    depends_on:
-      - mysql
-      - redis 
-    command: php artisan queue:work --verbose --tries=3 --timeout=90
 
 volumes:
   db_data:    
